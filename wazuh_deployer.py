@@ -15,6 +15,7 @@ from typing import Dict, Any, Optional
 import colorama
 from colorama import Fore, Style, Back
 import jsonschema
+from dotenv import load_dotenv
 
 # Initialize colorama for cross-platform colored output
 colorama.init()
@@ -49,6 +50,13 @@ class WazuhDeployer:
         
         # Check and install dependencies
         self.check_dependencies()
+        
+        # Load .env file
+        self.env_file = self.project_dir / ".env"
+        load_dotenv(self.env_file)
+        
+        # Check and prompt for mandatory environment variables
+        self.check_mandatory_variables()
         
         # Create necessary directories
         self.logs_dir.mkdir(exist_ok=True)
@@ -205,6 +213,158 @@ class WazuhDeployer:
                 print(f"{Fore.RED}Error installing packages: {e}{Style.RESET_ALL}")
                 print(f"{Fore.YELLOW}Please run: pip install -r requirements.txt{Style.RESET_ALL}")
                 sys.exit(1)
+    
+    def get_mandatory_variables(self) -> Dict[str, Dict[str, Any]]:
+        """Define mandatory environment variables with their properties"""
+        return {
+            'WAZUH_MANAGER_HOST': {
+                'description': 'Wazuh Manager host or IP address',
+                'default': 'localhost',
+                'required': True
+            },
+            'WAZUH_INDEXER_HOST': {
+                'description': 'Wazuh Indexer host or IP address',
+                'default': 'localhost',
+                'required': True
+            },
+            'WAZUH_DASHBOARD_HOST': {
+                'description': 'Wazuh Dashboard host or IP address',
+                'default': 'localhost',
+                'required': True
+            },
+            'WAZUH_API_USER': {
+                'description': 'Wazuh API username',
+                'default': 'admin',
+                'required': True
+            },
+            'WAZUH_API_PASSWORD': {
+                'description': 'Wazuh API password',
+                'default': None,
+                'required': True,
+                'secret': True
+            },
+            'INDEXER_USER': {
+                'description': 'Indexer username',
+                'default': 'admin',
+                'required': True
+            },
+            'INDEXER_PASSWORD': {
+                'description': 'Indexer password',
+                'default': None,
+                'required': True,
+                'secret': True
+            },
+            'ARCHITECTURE': {
+                'description': 'Deployment architecture (all-in-one or distributed)',
+                'default': 'all-in-one',
+                'required': True,
+                'options': ['all-in-one', 'distributed']
+            },
+            'ENABLE_TLS': {
+                'description': 'Enable TLS encryption (true/false)',
+                'default': 'true',
+                'required': True,
+                'options': ['true', 'false']
+            },
+        }
+    
+    def check_mandatory_variables(self):
+        """Check mandatory environment variables and prompt if missing"""
+        mandatory_vars = self.get_mandatory_variables()
+        missing_vars = []
+        
+        print(f"\n{Fore.CYAN}{'='*70}{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}Configuration Check{Style.RESET_ALL}")
+        print(f"{Fore.CYAN}{'='*70}{Style.RESET_ALL}\n")
+        
+        # Check which variables are missing or empty
+        for var_name, var_config in mandatory_vars.items():
+            current_value = os.environ.get(var_name, '')
+            
+            if var_config['required'] and (not current_value or current_value == 'change_me'):
+                missing_vars.append((var_name, var_config))
+            else:
+                print(f"{Fore.GREEN}✓{Style.RESET_ALL} {var_name}: {'*' * len(current_value) if var_config.get('secret') else current_value}")
+        
+        if not missing_vars:
+            print(f"\n{Fore.GREEN}All mandatory variables are configured.{Style.RESET_ALL}\n")
+            return
+        
+        # Prompt for missing variables
+        print(f"\n{Fore.YELLOW}The following mandatory variables are missing or empty:{Style.RESET_ALL}\n")
+        for var_name, var_config in missing_vars:
+            print(f"{Fore.RED}✗{Style.RESET_ALL} {var_name} - {var_config['description']}")
+        
+        print(f"\n{Fore.YELLOW}Please provide values for the missing variables:{Style.RESET_ALL}\n")
+        
+        new_values = {}
+        for var_name, var_config in missing_vars:
+            prompt = f"{Fore.CYAN}{var_name} ({var_config['description']}){Style.RESET_ALL}"
+            
+            if var_config.get('default'):
+                prompt += f" [{var_config['default']}]: "
+            else:
+                prompt += ": "
+            
+            while True:
+                if var_config.get('secret'):
+                    # For passwords, use getpass if available
+                    try:
+                        import getpass
+                        value = getpass.getpass(prompt)
+                    except ImportError:
+                        value = input(prompt + "(input will be visible): ")
+                else:
+                    value = input(prompt)
+                
+                # Use default if empty
+                if not value and var_config.get('default'):
+                    value = var_config['default']
+                
+                # Validate options if specified
+                if var_config.get('options') and value not in var_config['options']:
+                    print(f"{Fore.RED}Invalid value. Options: {', '.join(var_config['options'])}{Style.RESET_ALL}")
+                    continue
+                
+                # Check if required
+                if var_config['required'] and not value:
+                    print(f"{Fore.RED}This field is required.{Style.RESET_ALL}")
+                    continue
+                
+                new_values[var_name] = value
+                break
+        
+        # Update .env file with new values
+        self.update_env_file(new_values)
+        
+        print(f"\n{Fore.GREEN}Configuration updated successfully.{Style.RESET_ALL}\n")
+    
+    def update_env_file(self, new_values: Dict[str, str]):
+        """Update the .env file with new values"""
+        env_content = {}
+        
+        # Read existing .env file if it exists
+        if self.env_file.exists():
+            with open(self.env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_content[key] = value
+        
+        # Update with new values
+        env_content.update(new_values)
+        
+        # Write back to .env file
+        with open(self.env_file, 'w') as f:
+            f.write("# Wazuh Deployer - Environment Configuration\n")
+            f.write("# Generated by Wazuh Deployer\n\n")
+            
+            for key, value in env_content.items():
+                f.write(f"{key}={value}\n")
+        
+        # Reload environment variables
+        load_dotenv(self.env_file, override=True)
 
     
     def print_header(self):
