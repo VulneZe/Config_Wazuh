@@ -1,0 +1,23 @@
+# Wazuh Deployer - Python Dependencies
+# Version 1.0
+
+# Core dependencies
+PyYAML>=6.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+paramiko>=3.3.0
+colorama>=0.4.6
+
+# System information
+psutil>=5.9.0
+distro>=1.9.0
+
+# Configuration validation
+jsonschema>=4.20.0
+
+# Logging
+python-json-logger>=2.0.7
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0

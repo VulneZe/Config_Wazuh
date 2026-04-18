@@ -1,0 +1,325 @@
+# Wazuh Deployer - Central Configuration
+# This file contains the main configuration for the Wazuh deployment
+
+# Project metadata
+project:
+  name: "Wazuh Deployer"
+  version: "1.0.0"
+  description: "Automated Wazuh configuration and deployment tool"
+  author: "Obeo Security Team"
+  architecture: "all-in-one"  # all-in-one or distributed
+  wazuh_version: "4.14"
+
+# Wazuh installation paths (configurable)
+paths:
+  wazuh_config: "/var/ossec/etc"
+  wazuh_shared: "/var/ossec/etc/shared"
+  wazuh_logs: "/var/ossec/logs"
+  wazuh_bin: "/var/ossec/bin"
+  indexer_config: "/etc/wazuh-indexer"
+  dashboard_config: "/usr/share/wazuh-dashboard/config"
+  certs_dir: "/etc/wazuh/certs"
+  wodles_dir: "/var/ossec/etc/wodles"
+
+# Deployment phases
+phases:
+  phase0_cadrage:
+    enabled: true
+    description: "Architecture, volumétrie, sécurité réseau, certificats"
+    
+  phase1_socle:
+    enabled: true
+    description: "Installation indexer/server/dashboard, TLS, RBAC"
+    
+  phase2_agents:
+    enabled: true
+    description: "Enrôlement, groupes d'agents, config centralisée"
+    
+  phase3_dashboard:
+    enabled: true
+    description: "Data views, dashboards, reporting, monitors"
+    
+  phase4_integrations:
+    enabled: true
+    description: "Docker, AWS, GCP, GitHub, Office 365, Graph"
+    
+  phase5_detection:
+    enabled: true
+    description: "Tuning du bruit, règles locales, KPI SOC"
+
+# Wazuh component configuration
+components:
+  wazuh_server:
+    enabled: true
+    min_ram: 2048
+    recommended_ram: 4096
+    min_vcpu: 2
+    recommended_vcpu: 8
+    install_path: /var/ossec
+    
+  wazuh_indexer:
+    enabled: true
+    min_ram: 4096
+    recommended_ram: 16384
+    min_vcpu: 2
+    recommended_vcpu: 8
+    install_path: /etc/wazuh-indexer
+    heap_size: 4g  # JVM heap size
+    
+  wazuh_dashboard:
+    enabled: true
+    min_ram: 4096
+    recommended_ram: 8192
+    min_vcpu: 2
+    recommended_vcpu: 4
+    install_path: /usr/share/wazuh-dashboard
+
+# Agent groups configuration
+agent_groups:
+  default:
+    description: "Socle minimal pour tous les agents"
+    priority: 1
+    
+  linux-servers-prod:
+    description: "Services applicatifs et serveurs métier de production"
+    priority: 2
+    modules:
+      - syscollector
+      - vulnerability_detection
+      - sca
+      - fim
+      - ssh_logs
+      - sudo_logs
+      - app_logs
+      
+  linux-servers-infra:
+    description: "DNS, annuaire, bastions, supervision, VPN, stockage"
+    priority: 2
+    modules:
+      - syscollector
+      - vulnerability_detection
+      - sca
+      - fim_critical
+      - auth_logs
+      - system_logs
+      
+  linux-dev-workstations:
+    description: "Postes développeurs et ingénierie"
+    priority: 3
+    modules:
+      - syscollector
+      - vulnerability_detection
+      - browser_extensions
+      - ssh_logs
+      - docker_logs
+      
+  rh-office:
+    description: "Postes ou serveurs manipulant des données RH"
+    priority: 2
+    modules:
+      - syscollector
+      - sca
+      - auth_logs
+      - compliance
+      
+  hypervisors-xen:
+    description: "Dom0, nœuds d'administration et outils de gestion XEN"
+    priority: 1
+    modules:
+      - syscollector
+      - fim_critical
+      - xen_logs
+      - auth_logs
+      - sudo_logs
+      
+  docker-hosts:
+    description: "Hôtes exécutant des conteneurs"
+    priority: 2
+    modules:
+      - syscollector
+      - docker_listener
+      - fim_docker
+      - docker_logs
+      
+  exposed-services:
+    description: "Reverse proxies, frontaux Internet, services exposés"
+    priority: 1
+    modules:
+      - syscollector
+      - web_logs
+      - fim_web_config
+      - ssl_monitoring
+      
+  cloud-collectors:
+    description: "Intégrations AWS, GCP, GitHub, O365, Graph"
+    priority: 2
+    modules:
+      - cloud_aws
+      - cloud_gcp
+      - cloud_github
+      - cloud_o365
+      - cloud_graph
+
+# Technical base modules
+technical_base:
+  syscollector:
+    enabled: true
+    interval: 1h
+    scan_on_start: true
+    hardware: true
+    os: true
+    network: true
+    packages: true
+    ports_all: false
+    processes: true
+    users: true
+    groups: true
+    services: true
+    browser_extensions: true
+    
+  vulnerability_detection:
+    enabled: true
+    index_status: true
+    feed_update_interval: 60m
+    
+  sca:
+    enabled: true
+    scan_on_start: true
+    interval: 12h
+    skip_nfs: true
+    
+  fim:
+    enabled: true
+    frequency: 43200  # 12 hours
+    default_directories:
+      - /etc
+      - /opt
+      - /var/www
+    whodata_enabled: true
+    skip_nfs: true
+    skip_dev: true
+    skip_proc: true
+    skip_sys: true
+    nodiff_files:
+      - /etc/ssl/private.key
+      
+  active_response:
+    enabled: true
+    default_timeout: 60
+    repeated_offenders: "1,5,10"
+
+# Log collection
+log_collection:
+  linux_auth:
+    paths:
+      - /var/log/auth.log
+      - /var/log/secure
+    format: syslog
+    
+  linux_system:
+    paths:
+      - /var/log/syslog
+      - /var/log/messages
+    format: syslog
+    
+  linux_cron:
+    paths:
+      - /var/log/cron
+    format: syslog
+
+# Dashboard configuration
+dashboard:
+  data_views:
+    - wazuh-alerts-*
+    - wazuh-archives-*
+    - wazuh-monitoring-*
+    - wazuh-statistics-*
+    - wazuh-states-vulnerabilities-*
+    - wazuh-states-inventory-*
+    
+  dashboards:
+    - SOC Overview
+    - Endpoint Security
+    - IT Hygiene
+    - Cloud Security
+    - Compliance
+    - Management
+    
+  monitors:
+    - agent_disconnected
+    - integration_failure
+    - fim_sensitive_change
+    - ssh_failure_spike
+    - privilege_escalation
+    - vulnerability_critical_sla
+
+# Compliance frameworks
+compliance:
+  pci_dss:
+    enabled: true
+    description: "PCI DSS compliance controls"
+    
+  gdpr:
+    enabled: true
+    description: "RGPD compliance controls"
+    
+  hipaa:
+    enabled: true
+    description: "HIPAA compliance controls"
+    
+  nist_800_53:
+    enabled: true
+    description: "NIST 800-53 compliance controls"
+    
+  tsc:
+    enabled: true
+    description: "TSC compliance controls"
+
+# Retention policies
+retention:
+  wazuh_alerts:
+    days: 180
+    description: "Base SOC and compliance short/medium term"
+    
+  wazuh_archives:
+    days: 30
+    description: "Forensic and audit"
+    
+  wazuh_monitoring:
+    days: 90
+    description: "Agent health and operational monitoring"
+    
+  wazuh_statistics:
+    days: 30
+    description: "Platform diagnostics"
+    
+  wazuh_vulnerabilities:
+    days: 180
+    description: "Remediation tracking"
+    
+  wazuh_inventory:
+    days: 180
+    description: "IT hygiene and state evidence"
+
+# Validation and testing
+validation:
+  pre_installation_checks:
+    - check_os_compatibility
+    - check_disk_space
+    - check_memory
+    - check_network_connectivity
+    - check_port_availability
+    
+  post_installation_checks:
+    - check_services_running
+    - check_tls_configuration
+    - check_api_connectivity
+    - check_indexer_health
+    - check_dashboard_access
+
+# Rollback configuration
+rollback:
+  enabled: true
+  backup_before_changes: true
+  automatic_rollback_on_failure: false
+  max_rollback_points: 5

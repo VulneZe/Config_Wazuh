@@ -1,0 +1,501 @@
+# Wazuh Agent Groups Configuration
+# Detailed configuration for each agent group based on Obeo requirements
+
+groups:
+  default:
+    description: "Socle minimal pour tous les agents"
+    labels:
+      - site=default
+      - env=unknown
+      - owner=unknown
+      - criticality=tier3
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 12h
+
+  linux-servers-prod:
+    description: "Services applicatifs et serveurs métier de production"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=infra
+      - criticality=tier1
+      - exposed=no
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+        hardware: true
+        os: true
+        network: true
+        packages: true
+        processes: true
+        users: true
+        groups: true
+        services: true
+        browser_extensions: true
+      vulnerability_detection:
+        enabled: true
+        index_status: true
+      sca:
+        enabled: true
+        interval: 12h
+        benchmarks:
+          - CIS Ubuntu Linux
+          - CIS Debian Linux
+          - PCI DSS
+      fim:
+        enabled: true
+        frequency: 43200
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /opt
+            check_all: true
+            whodata: true
+          - path: /var/www
+            check_all: true
+            whodata: true
+        nodiff:
+          - /etc/ssl/private.key
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/syslog
+          format: syslog
+        - location: /var/log/secure
+          format: syslog
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  linux-servers-infra:
+    description: "DNS, annuaire, bastions, supervision, VPN, stockage"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=infra
+      - criticality=tier1
+      - exposed=yes
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 12h
+        benchmarks:
+          - CIS Ubuntu Linux
+          - CIS Debian Linux
+          - NIST 800-53
+      fim:
+        enabled: true
+        frequency: 21600  # 6 hours for infra
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /etc/ssh
+            check_all: true
+            whodata: true
+          - path: /etc/sudoers.d
+            check_all: true
+            whodata: true
+          - path: /var/log
+            check_all: false
+            whodata: false
+        nodiff:
+          - /etc/shadow
+          - /etc/ssl/*.key
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/secure
+          format: syslog
+        - location: /var/log/syslog
+          format: syslog
+        - location: /var/log/cron
+          format: syslog
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  linux-dev-workstations:
+    description: "Postes développeurs et ingénierie"
+    labels:
+      - site=nantes
+      - env=dev
+      - owner=devops
+      - criticality=tier2
+      - exposed=no
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 2h
+        hardware: true
+        os: true
+        network: true
+        packages: true
+        processes: true
+        users: true
+        groups: true
+        services: true
+        browser_extensions: true
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 24h
+        benchmarks:
+          - CIS Ubuntu Linux
+      fim:
+        enabled: true
+        frequency: 86400  # 24 hours for workstations
+        directories:
+          - path: /home
+            check_all: true
+            whodata: false
+          - path: /etc
+            check_all: true
+            whodata: true
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/syslog
+          format: syslog
+      anti_tampering:
+        enabled: false
+
+  rh-office:
+    description: "Postes ou serveurs manipulant des données RH"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=rh
+      - criticality=tier1
+      - exposed=no
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 12h
+        benchmarks:
+          - CIS Ubuntu Linux
+          - RGPD
+          - HIPAA
+      fim:
+        enabled: true
+        frequency: 43200
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /home
+            check_all: false
+            whodata: false
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/syslog
+          format: syslog
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  hypervisors-xen:
+    description: "Dom0, nœuds d'administration et outils de gestion XEN"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=infra
+      - criticality=tier1
+      - exposed=yes
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 30m
+        hardware: true
+        os: true
+        network: true
+        packages: true
+        processes: true
+        users: true
+        groups: true
+        services: true
+      vulnerability_detection:
+        enabled: true
+        index_status: true
+      sca:
+        enabled: true
+        interval: 6h
+        benchmarks:
+          - CIS Ubuntu Linux
+          - CIS Debian Linux
+          - NIST 800-53
+      fim:
+        enabled: true
+        frequency: 3600  # 1 hour for hypervisors
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /etc/xen
+            check_all: true
+            whodata: true
+          - path: /var/log/xen
+            check_all: false
+            whodata: false
+          - path: /var/log
+            check_all: false
+            whodata: false
+        nodiff:
+          - /etc/shadow
+          - /etc/xen/*.key
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/secure
+          format: syslog
+        - location: /var/log/xen
+          format: syslog
+        - location: /var/log/xen/xen-hotplug.log
+          format: syslog
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  docker-hosts:
+    description: "Hôtes exécutant des conteneurs"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=devops
+      - criticality=tier2
+      - exposed=no
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 12h
+        benchmarks:
+          - CIS Docker
+          - CIS Ubuntu Linux
+      fim:
+        enabled: true
+        frequency: 43200
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /var/lib/docker
+            check_all: false
+            whodata: false
+          - path: /opt/docker
+            check_all: true
+            whodata: true
+          - path: /var/www
+            check_all: true
+            whodata: true
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      docker_listener:
+        enabled: true
+        interval: 10m
+        attempts: 5
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/syslog
+          format: syslog
+        - location: /var/log/docker.log
+          format: syslog
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  exposed-services:
+    description: "Reverse proxies, frontaux Internet, services exposés"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=infra
+      - criticality=tier1
+      - exposed=yes
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+        index_status: true
+      sca:
+        enabled: true
+        interval: 12h
+        benchmarks:
+          - CIS Ubuntu Linux
+          - CIS Nginx
+          - CIS Apache
+          - PCI DSS
+      fim:
+        enabled: true
+        frequency: 21600
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+          - path: /etc/nginx
+            check_all: true
+            whodata: true
+          - path: /etc/apache2
+            check_all: true
+            whodata: true
+          - path: /etc/traefik
+            check_all: true
+            whodata: true
+          - path: /var/www
+            check_all: true
+            whodata: true
+          - path: /etc/ssl
+            check_all: true
+            whodata: true
+        nodiff:
+          - /etc/ssl/*.key
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      logs:
+        - location: /var/log/auth.log
+          format: syslog
+        - location: /var/log/nginx/access.log
+          format: nginx
+        - location: /var/log/nginx/error.log
+          format: nginx
+        - location: /var/log/apache2/access.log
+          format: apache
+        - location: /var/log/apache2/error.log
+          format: apache
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+  cloud-collectors:
+    description: "Intégrations AWS, GCP, GitHub, O365, Graph"
+    labels:
+      - site=nantes
+      - env=prod
+      - owner=security
+      - criticality=tier1
+      - exposed=no
+    configuration:
+      syscollector:
+        enabled: true
+        interval: 1h
+      vulnerability_detection:
+        enabled: true
+      sca:
+        enabled: true
+        interval: 12h
+      fim:
+        enabled: true
+        frequency: 43200
+        directories:
+          - path: /etc
+            check_all: true
+            whodata: true
+        skip_nfs: true
+        skip_dev: true
+        skip_proc: true
+        skip_sys: true
+      cloud_integrations:
+        aws:
+          enabled: false
+          interval: 10m
+          services:
+            - cloudtrail
+        gcp:
+          enabled: false
+          interval: 1m
+          services:
+            - audit_logs
+            - vpc_flow_logs
+        github:
+          enabled: false
+          interval: 1m
+          event_types:
+            - all
+        office365:
+          enabled: false
+          interval: 1m
+          subscriptions:
+            - Audit.AzureActiveDirectory
+            - Audit.General
+        ms_graph:
+          enabled: false
+          interval: 5m
+          resources:
+            - security/alerts_v2
+            - security/incidents
+            - auditLogs/signIns
+      anti_tampering:
+        enabled: true
+        package_uninstallation: yes
+
+# Active response configuration by group
+active_response:
+  default:
+    enabled: false
+    
+  tier1_groups:
+    - linux-servers-infra
+    - hypervisors-xen
+    - exposed-services
+    - rh-office
+    - cloud-collectors
+    enabled: true
+    commands:
+      - host-deny
+      - firewalld-drop
+    timeout: 60
+    repeated_offenders: "1,5,10"
+    rules_group: "sshd,|pci_dss_11.4,"
+    level: 10
