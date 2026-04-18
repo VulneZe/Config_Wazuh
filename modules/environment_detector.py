@@ -9,7 +9,9 @@ import subprocess
 import logging
 import psutil
 import distro
+import socket
 from typing import Dict, Any, Optional
+from colorama import Fore, Style
 
 
 class EnvironmentDetector:

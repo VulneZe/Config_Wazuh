@@ -486,11 +486,12 @@ active_response:
     enabled: false
     
   tier1_groups:
-    - linux-servers-infra
-    - hypervisors-xen
-    - exposed-services
-    - rh-office
-    - cloud-collectors
+    groups:
+      - linux-servers-infra
+      - hypervisors-xen
+      - exposed-services
+      - rh-office
+      - cloud-collectors
     enabled: true
     commands:
       - host-deny
