@@ -288,53 +288,184 @@ class EnvironmentDetector:
         return validation
     
     def print_environment_summary(self):
-        """Print environment summary to console"""
+        """Print environment summary to console with recommendations"""
         print("\n" + "="*70)
         print("ENVIRONMENT DETECTION SUMMARY")
         print("="*70 + "\n")
         
         # OS
         os_info = self.environment_info.get('os', {})
-        print(f"Operating System:")
+        print(f"{Fore.CYAN}Operating System:{Style.RESET_ALL}")
         print(f"  - System: {os_info.get('system', 'Unknown')}")
         print(f"  - Distribution: {os_info.get('distribution', 'Unknown')}")
         print(f"  - Version: {os_info.get('distribution_version', 'Unknown')}")
-        print(f"  - Hostname: {os_info.get('hostname', 'Unknown')}\n")
+        print(f"  - Hostname: {os_info.get('hostname', 'Unknown')}")
+        print(f"  - Architecture: {os_info.get('machine', 'Unknown')}")
+        print()
         
         # Hardware
         hardware = self.environment_info.get('hardware', {})
-        print(f"Hardware Resources:")
+        print(f"{Fore.CYAN}Hardware Resources:{Style.RESET_ALL}")
         print(f"  - CPU: {hardware.get('cpu_physical', 'Unknown')} cores "
               f"({hardware.get('cpu_count', 'Unknown')} threads)")
         print(f"  - RAM: {hardware.get('memory_total_gb', 0)} GB total, "
-              f"{hardware.get('memory_available_gb', 0)} GB available")
+              f"{hardware.get('memory_available_gb', 0)} GB available ({hardware.get('memory_percent', 0)}% used)")
         print(f"  - Disk: {hardware.get('disk_total_gb', 0)} GB total, "
-              f"{hardware.get('disk_free_gb', 0)} GB free\n")
+              f"{hardware.get('disk_free_gb', 0)} GB free ({hardware.get('disk_percent', 0)}% used)")
+        print()
+        
+        # Hardware recommendations
+        self.print_hardware_recommendations(hardware)
+        
+        # Network
+        network = self.environment_info.get('network', {})
+        print(f"{Fore.CYAN}Network Configuration:{Style.RESET_ALL}")
+        interfaces = network.get('interfaces', [])
+        print(f"  - Interfaces: {len(interfaces)} detected")
+        for interface in interfaces[:3]:  # Show first 3 interfaces
+            print(f"    - {interface['name']}")
+            for addr in interface['addresses'][:2]:  # Show first 2 addresses
+                print(f"      {addr['family']}: {addr['address']}")
+        if len(interfaces) > 3:
+            print(f"    ... and {len(interfaces) - 3} more")
+        
+        if 'default_gateway' in network:
+            print(f"  - Default Gateway: {network['default_gateway']}")
+        
+        if 'dns_servers' in network:
+            print(f"  - DNS Servers: {', '.join(network['dns_servers'][:3])}")
+        print()
         
         # Dependencies
         deps = self.environment_info.get('dependencies', {})
-        print(f"Dependencies:")
+        print(f"{Fore.CYAN}Dependencies:{Style.RESET_ALL}")
         for dep, status in deps.items():
-            status_str = "✓" if status else "✗"
+            status_str = f"{Fore.GREEN}✓{Style.RESET_ALL}" if status else f"{Fore.RED}✗{Style.RESET_ALL}"
             print(f"  - {dep}: {status_str}")
         print()
         
         # Wazuh Components
         wazuh = self.environment_info.get('wazuh_components', {})
-        print(f"Wazuh Components:")
+        print(f"{Fore.CYAN}Wazuh Components:{Style.RESET_ALL}")
         for comp, status in wazuh.items():
             if isinstance(status, bool):
-                status_str = "✓ Installed" if status else "✗ Not installed"
+                status_str = f"{Fore.GREEN}✓ Installed{Style.RESET_ALL}" if status else f"{Fore.RED}✗ Not installed{Style.RESET_ALL}"
                 print(f"  - {comp}: {status_str}")
+        
+        paths = wazuh.get('paths', {})
+        if paths:
+            print(f"\n  Installation Paths:")
+            for comp, exists in paths.items():
+                status_str = f"{Fore.GREEN}✓{Style.RESET_ALL}" if exists else f"{Fore.RED}✗{Style.RESET_ALL}"
+                print(f"    - {comp}: {status_str}")
+        print()
+        
+        # Wazuh recommendations
+        self.print_wazuh_recommendations(wazuh)
+        
+        # Ports
+        ports = self.environment_info.get('ports', {})
+        print(f"{Fore.CYAN}Port Availability:{Style.RESET_ALL}")
+        port_names = {
+            15150: "Wazuh Manager API",
+            1514: "Wazuh Manager",
+            9200: "Wazuh Indexer",
+            443: "Wazuh Dashboard"
+        }
+        for port, available in ports.items():
+            status_str = f"{Fore.GREEN}Available{Style.RESET_ALL}" if available else f"{Fore.RED}In use{Style.RESET_ALL}"
+            print(f"  - {port_names.get(port, f'Port {port}')}: {status_str}")
         print()
         
         # Validation
         validation = self.environment_info.get('validation', {})
-        print(f"Validation:")
+        print(f"{Fore.CYAN}Validation:{Style.RESET_ALL}")
         overall = validation.get('overall', False)
-        print(f"  - Overall: {'✓ PASS' if overall else '✗ FAIL'}")
+        overall_str = f"{Fore.GREEN}✓ PASS{Style.RESET_ALL}" if overall else f"{Fore.RED}✗ FAIL{Style.RESET_ALL}"
+        print(f"  - Overall: {overall_str}")
         for check, status in validation.items():
             if check != 'overall':
-                status_str = "✓" if status else "✗"
+                status_str = f"{Fore.GREEN}✓{Style.RESET_ALL}" if status else f"{Fore.RED}✗{Style.RESET_ALL}"
                 print(f"  - {check}: {status_str}")
+        print()
+        
+        # Overall recommendations
+        self.print_overall_recommendations(validation)
+    
+    def print_hardware_recommendations(self, hardware: Dict[str, Any]):
+        """Print hardware-specific recommendations"""
+        print(f"{Fore.YELLOW}Hardware Recommendations:{Style.RESET_ALL}")
+        
+        # CPU recommendations
+        cpu_cores = hardware.get('cpu_physical', 0)
+        if cpu_cores < 2:
+            print(f"  {Fore.RED}⚠{Style.RESET_ALL} CPU: Minimum 2 cores required for all-in-one, 8+ recommended for production")
+        elif cpu_cores < 8:
+            print(f"  {Fore.YELLOW}⚠{Style.RESET_ALL} CPU: 8+ cores recommended for production deployment")
+        else:
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} CPU: Sufficient for production")
+        
+        # RAM recommendations
+        ram_gb = hardware.get('memory_total_gb', 0)
+        if ram_gb < 4:
+            print(f"  {Fore.RED}⚠{Style.RESET_ALL} RAM: Minimum 4GB required for all-in-one")
+        elif ram_gb < 8:
+            print(f"  {Fore.YELLOW}⚠{Style.RESET_ALL} RAM: 8-16GB recommended for all-in-one, 32GB+ for distributed")
+        elif ram_gb < 32:
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} RAM: Sufficient for all-in-one, consider 32GB+ for distributed")
+        else:
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} RAM: Excellent for production")
+        
+        # Disk recommendations
+        disk_free_gb = hardware.get('disk_free_gb', 0)
+        if disk_free_gb < 20:
+            print(f"  {Fore.RED}⚠{Style.RESET_ALL} Disk: Minimum 20GB free space required")
+        elif disk_free_gb < 50:
+            print(f"  {Fore.YELLOW}⚠{Style.RESET_ALL} Disk: 50GB+ recommended for production logs")
+        else:
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} Disk: Sufficient space available")
+        print()
+    
+    def print_wazuh_recommendations(self, wazuh: Dict[str, Any]):
+        """Print Wazuh-specific recommendations"""
+        print(f"{Fore.YELLOW}Wazuh Deployment Recommendations:{Style.RESET_ALL}")
+        
+        installed_count = sum([v for k, v in wazuh.items() if isinstance(v, bool)])
+        
+        if installed_count == 0:
+            print(f"  {Fore.YELLOW}ℹ{Style.RESET_ALL} No Wazuh components detected")
+            print(f"  {Fore.CYAN}→{Style.RESET_ALL} Recommend: Full deployment (all-in-one architecture)")
+        elif installed_count == 3:
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} All Wazuh components installed")
+            print(f"  {Fore.CYAN}→{Style.RESET_ALL} Recommend: Configuration update only")
+        else:
+            print(f"  {Fore.YELLOW}⚠{Style.RESET_ALL} Partial Wazuh installation detected ({installed_count}/3 components)")
+            print(f"  {Fore.CYAN}→{Style.RESET_ALL} Recommend: Complete installation or reconfigure existing")
+        
+        print()
+    
+    def print_overall_recommendations(self, validation: Dict[str, Any]):
+        """Print overall deployment recommendations"""
+        print(f"{Fore.YELLOW}Overall Deployment Recommendations:{Style.RESET_ALL}")
+        
+        if validation.get('overall'):
+            print(f"  {Fore.GREEN}✓{Style.RESET_ALL} Environment is suitable for Wazuh deployment")
+            print(f"  {Fore.CYAN}→{Style.RESET_ALL} You can proceed with full deployment")
+        else:
+            print(f"  {Fore.RED}⚠{Style.RESET_ALL} Environment has issues that need attention")
+            
+            if not validation.get('os_compatible'):
+                print(f"  {Fore.RED}✗{Style.RESET_ALL} OS not compatible - Linux required")
+            
+            if not validation.get('memory_sufficient'):
+                print(f"  {Fore.RED}✗{Style.RESET_ALL} Insufficient memory - minimum 4GB required")
+            
+            if not validation.get('disk_sufficient'):
+                print(f"  {Fore.RED}✗{Style.RESET_ALL} Insufficient disk space - minimum 20GB required")
+            
+            if not validation.get('dependencies_ok'):
+                print(f"  {Fore.RED}✗{Style.RESET_ALL} Missing dependencies - install curl, openssl, systemctl")
+            
+            print(f"  {Fore.CYAN}→{Style.RESET_ALL} Address the issues above before proceeding")
+        
         print()
